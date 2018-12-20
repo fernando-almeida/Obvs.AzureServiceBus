@@ -3,21 +3,24 @@ using System.Collections.Generic;
 using System.Reactive.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+
 using FluentAssertions;
-using Microsoft.ServiceBus.Messaging;
+
+using Microsoft.Azure.ServiceBus;
+
 using Moq;
+
 using Obvs.AzureServiceBus.Configuration;
 using Obvs.AzureServiceBus.Infrastructure;
 using Obvs.MessageProperties;
 using Obvs.Serialization;
 using Obvs.Serialization.Json;
 using Obvs.Types;
+
 using Xunit;
 
-namespace Obvs.AzureServiceBus.Tests
-{
-    public class EndpointProviderFacts
-    {
+namespace Obvs.AzureServiceBus.Tests {
+    public class EndpointProviderFacts {
         private readonly Func<Assembly, bool> _testAssemblyFilter = a => typeof(EndpointProviderFacts).Assembly.Equals(a);
         private readonly Func<Type, bool> _testMessageTypeFilter = t => typeof(TestMessage).IsAssignableFrom(t);
 
@@ -25,11 +28,8 @@ namespace Obvs.AzureServiceBus.Tests
 
         private readonly Mock<IMessageOutgoingPropertiesTable> _mockMessageOutgoingPropertiesTable;
 
-
-        public EndpointProviderFacts()
-        {
-            _messageTypePathMappings = new List<MessageTypeMessagingEntityMappingDetails>
-            {
+        public EndpointProviderFacts() {
+            _messageTypePathMappings = new List<MessageTypeMessagingEntityMappingDetails> {
                 new MessageTypeMessagingEntityMappingDetails(typeof(TestCommand), "commands", MessagingEntityType.Queue),
                 new MessageTypeMessagingEntityMappingDetails(typeof(TestEvent), "events", MessagingEntityType.Topic)
             };
@@ -37,121 +37,101 @@ namespace Obvs.AzureServiceBus.Tests
             _mockMessageOutgoingPropertiesTable = new Mock<IMessageOutgoingPropertiesTable>();
         }
 
-        public class ConstructorFacts : EndpointProviderFacts
-        {
+        public class ConstructorFacts : EndpointProviderFacts {
             [Fact]
-            public void CreatingWithNullMessagingFactoryThrows()
-            {
-                Action action = () =>
-                {
+            public void CreatingWithNullMessagingFactoryThrows() {
+                Action action = () => {
                     new AzureServiceBusEndpointProvider<TestMessage, TestMessage, TestCommand, TestEvent, TestRequest, TestResponse>("TestEndpoint", null, Mock.Of<IMessageSerializer>(), Mock.Of<IMessageDeserializerFactory>(), _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, new MessagePropertyProviderManager<TestMessage>(), _mockMessageOutgoingPropertiesTable.Object);
                 };
 
-                action.ShouldThrow<ArgumentNullException>().And.ParamName.Should().Be("messagingFactory");
+                action.Should().Throw<ArgumentNullException>().And.ParamName.Should().Be("messagingFactory");
             }
 
             [Fact]
-            public void CreatingWithNullMessageSerializerThrows()
-            {
-                Action action = () =>
-                {
+            public void CreatingWithNullMessageSerializerThrows() {
+                Action action = () => {
                     new AzureServiceBusEndpointProvider<TestMessage, TestMessage, TestCommand, TestEvent, TestRequest, TestResponse>("TestEndpoint", Mock.Of<IMessagingFactory>(), null, Mock.Of<IMessageDeserializerFactory>(), _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, new MessagePropertyProviderManager<TestMessage>(), _mockMessageOutgoingPropertiesTable.Object);
                 };
 
-                action.ShouldThrow<ArgumentNullException>().And.ParamName.Should().Be("messageSerializer");
+                action.Should().Throw<ArgumentNullException>().And.ParamName.Should().Be("messageSerializer");
             }
 
             [Fact]
-            public void CreatingWithNullMessageDeserializerFactoryThrows()
-            {
-                Action action = () =>
-                {
+            public void CreatingWithNullMessageDeserializerFactoryThrows() {
+                Action action = () => {
                     new AzureServiceBusEndpointProvider<TestMessage, TestMessage, TestCommand, TestEvent, TestRequest, TestResponse>("TestEndpoint", Mock.Of<IMessagingFactory>(), Mock.Of<IMessageSerializer>(), null, _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, new MessagePropertyProviderManager<TestMessage>(), _mockMessageOutgoingPropertiesTable.Object);
                 };
 
-                action.ShouldThrow<ArgumentNullException>().And.ParamName.Should().Be("messageDeserializerFactory");
+                action.Should().Throw<ArgumentNullException>().And.ParamName.Should().Be("messageDeserializerFactory");
             }
 
             [Fact]
-            public void CreatingWithNullMessageTypePathMappingsThrows()
-            {
-                Action action = () =>
-                {
+            public void CreatingWithNullMessageTypePathMappingsThrows() {
+                Action action = () => {
                     new AzureServiceBusEndpointProvider<TestMessage, TestMessage, TestCommand, TestEvent, TestRequest, TestResponse>("TestEndpoint", Mock.Of<IMessagingFactory>(), Mock.Of<IMessageSerializer>(), Mock.Of<IMessageDeserializerFactory>(), null, _testAssemblyFilter, _testMessageTypeFilter, new MessagePropertyProviderManager<TestMessage>(), _mockMessageOutgoingPropertiesTable.Object);
                 };
 
-                action.ShouldThrow<ArgumentNullException>().And.ParamName.Should().Be("messageTypePathMappings");
+                action.Should().Throw<ArgumentNullException>().And.ParamName.Should().Be("messageTypePathMappings");
             }
 
             [Fact]
-            public void CreatingWithEmptyMessageTypePathMappingsThrows()
-            {
-                Action action = () =>
-                {
+            public void CreatingWithEmptyMessageTypePathMappingsThrows() {
+                Action action = () => {
                     new AzureServiceBusEndpointProvider<TestMessage, TestMessage, TestCommand, TestEvent, TestRequest, TestResponse>("TestEndpoint", Mock.Of<IMessagingFactory>(), Mock.Of<IMessageSerializer>(), Mock.Of<IMessageDeserializerFactory>(), new List<MessageTypeMessagingEntityMappingDetails>(), _testAssemblyFilter, _testMessageTypeFilter, new MessagePropertyProviderManager<TestMessage>(), _mockMessageOutgoingPropertiesTable.Object);
                 };
 
-                action.ShouldThrow<ArgumentException>().And.ParamName.Should().Be("messageTypePathMappings");
+                action.Should().Throw<ArgumentException>().And.ParamName.Should().Be("messageTypePathMappings");
             }
 
             [Fact]
-            public void CreatingWithNullMessagePropertyProviderManagerThrows()
-            {
-                Action action = () =>
-                {
+            public void CreatingWithNullMessagePropertyProviderManagerThrows() {
+                Action action = () => {
                     new AzureServiceBusEndpointProvider<TestMessage, TestMessage, TestCommand, TestEvent, TestRequest, TestResponse>("TestEndpoint", Mock.Of<IMessagingFactory>(), Mock.Of<IMessageSerializer>(), Mock.Of<IMessageDeserializerFactory>(), _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, null, _mockMessageOutgoingPropertiesTable.Object);
                 };
 
-                action.ShouldThrow<ArgumentNullException>().And.ParamName.Should().Be("messagePropertyProviderManager");
+                action.Should().Throw<ArgumentNullException>().And.ParamName.Should().Be("messagePropertyProviderManager");
             }
 
-            public void CreatingWithNullMessageOutgoingMessagePropertiesTableThrows()
-            {
-                Action action = () =>
-                {
+            [Fact]
+            public void CreatingWithNullMessageOutgoingMessagePropertiesTableThrows() {
+                Action action = () => {
                     new AzureServiceBusEndpointProvider<TestMessage, TestMessage, TestCommand, TestEvent, TestRequest, TestResponse>("TestEndpoint", Mock.Of<IMessagingFactory>(), Mock.Of<IMessageSerializer>(), Mock.Of<IMessageDeserializerFactory>(), _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, new MessagePropertyProviderManager<TestMessage>(), null);
                 };
 
-                action.ShouldThrow<ArgumentNullException>().And.ParamName.Should().Be("messagePropertyProviderManager");
+                action.Should().Throw<ArgumentNullException>().And.ParamName.Should().Be("messagePropertyProviderManager");
             }
         }
 
-        public class CreateEndpointFacts : EndpointProviderFacts
-        {
+        public class CreateEndpointFacts : EndpointProviderFacts {
             private readonly Mock<IMessagingFactory> _mockMessagingFactory = new Mock<IMessagingFactory>();
             private readonly Mock<IMessageSerializer> _mockMessageSerializer = new Mock<IMessageSerializer>();
             private readonly Mock<IMessageDeserializerFactory> _mockMessageDeserializerFactory = new Mock<IMessageDeserializerFactory>();
             private readonly MessagePropertyProviderManager<TestMessage> _messagePropertyProviderManager = new MessagePropertyProviderManager<TestMessage>();
 
-            public CreateEndpointFacts()
-            {
-            }
+            public CreateEndpointFacts() { }
 
             [Fact]
-            public void CreateEndpoint()
-            {
+            public void CreateEndpoint() {
                 new AzureServiceBusEndpointProvider<TestMessage, TestMessage, TestCommand, TestEvent, TestRequest, TestResponse>(
-                    "TestEndpoint", _mockMessagingFactory.Object, _mockMessageSerializer.Object, _mockMessageDeserializerFactory.Object, _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, _messagePropertyProviderManager, _mockMessageOutgoingPropertiesTable.Object)
+                        "TestEndpoint", _mockMessagingFactory.Object, _mockMessageSerializer.Object, _mockMessageDeserializerFactory.Object, _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, _messagePropertyProviderManager, _mockMessageOutgoingPropertiesTable.Object)
                     .CreateEndpoint();
             }
 
             [Fact]
-            public async Task CanPublishEndpointEvents()
-            {
+            public async Task CanPublishEndpointEvents() {
                 _messageTypePathMappings.Add(new MessageTypeMessagingEntityMappingDetails(typeof(TestSpecificEvent1), "events/subscriptions/specific-events-1", MessagingEntityType.Subscription));
 
                 var mockMessageSender = new Mock<IMessageSender>();
-                mockMessageSender.Setup(mr => mr.SendAsync(It.IsNotNull<BrokeredMessage>()))
+                mockMessageSender.Setup(mr => mr.SendAsync(It.IsNotNull<Message>()))
                     .Returns(Task.FromResult(true));
 
                 _mockMessagingFactory.Setup(mf => mf.CreateMessageSender(It.IsNotNull<Type>(), It.IsNotNull<string>()))
                     .Returns(mockMessageSender.Object);
 
                 var endpointProvider = new AzureServiceBusEndpointProvider<TestMessage, TestMessage, TestCommand, TestEvent, TestRequest, TestResponse>(
-                    "TestEndpoint", _mockMessagingFactory.Object, new JsonMessageSerializer(), new JsonMessageDeserializerFactory(), _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, _messagePropertyProviderManager, _mockMessageOutgoingPropertiesTable.Object);
+                        "TestEndpoint", _mockMessagingFactory.Object, new JsonMessageSerializer(), new JsonMessageDeserializerFactory(typeof(TestSpecificEvent1)), _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, _messagePropertyProviderManager, _mockMessageOutgoingPropertiesTable.Object);
 
-                var testEvent = new TestSpecificEvent1
-                {
+                var testEvent = new TestSpecificEvent1 {
                     TestId = 1234
                 };
 
@@ -159,53 +139,46 @@ namespace Obvs.AzureServiceBus.Tests
 
                 _mockMessagingFactory.Verify(mf => mf.CreateMessageSender(It.Is<Type>(t => t == typeof(TestSpecificEvent1)), It.Is<string>(s => s == "events")), Times.Once());
 
-                mockMessageSender.Verify(mr => mr.SendAsync(It.IsAny<BrokeredMessage>()), Times.Once());
+                mockMessageSender.Verify(mr => mr.SendAsync(It.IsAny<Message>()), Times.Once());
             }
         }
 
-        public class CreateEndpointClientFacts : EndpointProviderFacts
-        {
+        public class CreateEndpointClientFacts : EndpointProviderFacts {
             private readonly Mock<IMessagingFactory> _mockMessagingFactory = new Mock<IMessagingFactory>();
             private readonly Mock<IMessageSerializer> _mockMessageSerializer = new Mock<IMessageSerializer>();
             private readonly Mock<IMessageDeserializerFactory> _mockMessageDeserializerFactory = new Mock<IMessageDeserializerFactory>();
             private readonly MessagePropertyProviderManager<TestMessage> _messagePropertyProviderManager = new MessagePropertyProviderManager<TestMessage>();
 
-            public CreateEndpointClientFacts()
-            {
-            }
-
+            public CreateEndpointClientFacts() { }
 
             [Fact]
-            public void CreateEndpointClient()
-            {
+            public void CreateEndpointClient() {
                 new AzureServiceBusEndpointProvider<TestMessage, TestMessage, TestCommand, TestEvent, TestRequest, TestResponse>(
-                    "TestEndpoint", _mockMessagingFactory.Object, _mockMessageSerializer.Object, _mockMessageDeserializerFactory.Object, _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, _messagePropertyProviderManager, _mockMessageOutgoingPropertiesTable.Object)
+                        "TestEndpoint", _mockMessagingFactory.Object, _mockMessageSerializer.Object, _mockMessageDeserializerFactory.Object, _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, _messagePropertyProviderManager, _mockMessageOutgoingPropertiesTable.Object)
                     .CreateEndpointClient();
             }
 
             [Fact]
-            public async Task CanReceiveEndpointClientEvents()
-            {
+            public async Task CanReceiveEndpointClientEvents() {
                 var testSubscriptionPath = "events/subscriptions/specific-events-1";
 
                 _messageTypePathMappings.Add(new MessageTypeMessagingEntityMappingDetails(typeof(TestSpecificEvent1), testSubscriptionPath, MessagingEntityType.Subscription));
 
-                var publishedEventBrokeredMessageTaskCompletionSource = new TaskCompletionSource<BrokeredMessage>();
+                var publishedEventMessageTaskCompletionSource = new TaskCompletionSource<Message>();
 
                 var mockMessageReceiver = new Mock<IMessageReceiver>();
                 mockMessageReceiver.Setup(mr => mr.ReceiveAsync())
-                    .Returns(() => publishedEventBrokeredMessageTaskCompletionSource.Task);
+                    .Returns(() => publishedEventMessageTaskCompletionSource.Task);
 
-                _mockMessagingFactory.Setup(mf => mf.CreateMessageReceiver(It.IsNotNull<Type>(), It.IsNotNull<string>(), It.IsAny<MessageReceiveMode>()))
+                _mockMessagingFactory.Setup(mf => mf.CreateMessageReceiver(It.IsNotNull<Type>(), It.IsNotNull<string>(), It.IsAny<ReceiveMode>()))
                     .Returns(mockMessageReceiver.Object);
 
                 var mockMessageSender = new Mock<IMessageSender>();
-                mockMessageSender.Setup(mr => mr.SendAsync(It.IsNotNull<BrokeredMessage>()))
-                    .Callback<BrokeredMessage>(bm =>
-                    {
+                mockMessageSender.Setup(mr => mr.SendAsync(It.IsNotNull<Message>()))
+                    .Callback<Message>(bm => {
 
-                        publishedEventBrokeredMessageTaskCompletionSource.SetResult(bm);
-                        publishedEventBrokeredMessageTaskCompletionSource = new TaskCompletionSource<BrokeredMessage>();
+                        publishedEventMessageTaskCompletionSource.SetResult(bm);
+                        publishedEventMessageTaskCompletionSource = new TaskCompletionSource<Message>();
                     })
                     .Returns(Task.FromResult(true));
 
@@ -213,16 +186,14 @@ namespace Obvs.AzureServiceBus.Tests
                     .Returns(mockMessageSender.Object);
 
                 var endpointProvider = new AzureServiceBusEndpointProvider<TestMessage, TestMessage, TestCommand, TestEvent, TestRequest, TestResponse>(
-                    "TestEndpoint", _mockMessagingFactory.Object, new JsonMessageSerializer(), new JsonMessageDeserializerFactory(), _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, _messagePropertyProviderManager, _mockMessageOutgoingPropertiesTable.Object);
+                        "TestEndpoint", _mockMessagingFactory.Object, new JsonMessageSerializer(), new JsonMessageDeserializerFactory(typeof(TestSpecificEvent1)), _messageTypePathMappings, _testAssemblyFilter, _testMessageTypeFilter, _messagePropertyProviderManager, _mockMessageOutgoingPropertiesTable.Object);
 
                 var endpointClient = endpointProvider.CreateEndpointClient();
 
                 var publishedEvents = endpointClient.Events.Replay();
 
-                using(publishedEvents.Connect())
-                {
-                    await endpointProvider.CreateEndpoint().PublishAsync(new TestSpecificEvent1
-                    {
+                using(publishedEvents.Connect()) {
+                    await endpointProvider.CreateEndpoint().PublishAsync(new TestSpecificEvent1 {
                         TestId = 1234
                     });
 
@@ -232,7 +203,7 @@ namespace Obvs.AzureServiceBus.Tests
                     testEvent.TestId.Should().Be(1234);
                 }
 
-                _mockMessagingFactory.Verify(mf => mf.CreateMessageReceiver(It.Is<Type>(it => it == typeof(TestSpecificEvent1)), testSubscriptionPath, It.Is<MessageReceiveMode>(mrm => mrm == MessageReceiveMode.ReceiveAndDelete)), Times.Once());
+                _mockMessagingFactory.Verify(mf => mf.CreateMessageReceiver(It.Is<Type>(it => it == typeof(TestSpecificEvent1)), testSubscriptionPath, It.Is<ReceiveMode>(mrm => mrm == ReceiveMode.ReceiveAndDelete)), Times.Once());
 
                 /* NOTE: it's possible ReceiveAsync will be called up to two times due to concurrency here:
                  * the first time will return the msg for the test, but then it's possible there will be a second call to ReceiveAsync to wait for the next message
@@ -242,55 +213,44 @@ namespace Obvs.AzureServiceBus.Tests
             }
         }
 
-        public class TestMessage : IMessage
-        {
-            public int TestId
-            {
+        public class TestMessage : IMessage {
+            public int TestId {
                 get;
                 set;
             }
         }
 
-        public class TestCommand : TestMessage, ICommand
-        {
+        public class TestCommand : TestMessage, ICommand {
 
         }
 
-        public class TestEvent : TestMessage, IEvent
-        {
+        public class TestEvent : TestMessage, IEvent {
 
         }
 
-        public class TestSpecificEvent1 : TestEvent
-        {
+        public class TestSpecificEvent1 : TestEvent {
 
         }
 
-        public class TestRequest : TestMessage, IRequest
-        {
-            public string RequesterId
-            {
+        public class TestRequest : TestMessage, IRequest {
+            public string RequesterId {
                 get;
                 set;
             }
 
-            public string RequestId
-            {
+            public string RequestId {
                 get;
                 set;
             }
         }
 
-        public class TestResponse : TestMessage, IResponse
-        {
-            public string RequesterId
-            {
+        public class TestResponse : TestMessage, IResponse {
+            public string RequesterId {
                 get;
                 set;
             }
 
-            public string RequestId
-            {
+            public string RequestId {
                 get;
                 set;
             }

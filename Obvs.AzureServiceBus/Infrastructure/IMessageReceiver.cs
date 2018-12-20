@@ -1,22 +1,20 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
-using Microsoft.ServiceBus.Messaging;
+
+using Microsoft.Azure.ServiceBus;
+
 using Obvs.AzureServiceBus.Configuration;
 
-namespace Obvs.AzureServiceBus.Infrastructure
-{
-    public interface IMessageReceiver : IDisposable
-    {
-        MessageReceiveMode Mode
-        {
+namespace Obvs.AzureServiceBus.Infrastructure {
+    public interface IMessageReceiver : IDisposable {
+        ReceiveMode Mode {
             get;
         }
 
-        bool IsClosed
-        {
+        bool IsClosed {
             get;
         }
 
-        Task<BrokeredMessage> ReceiveAsync();
+        Task<Message> ReceiveAsync();
     }
 }

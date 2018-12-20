@@ -1,50 +1,45 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.ServiceBus.Messaging;
 
-namespace Obvs.AzureServiceBus.Configuration
-{
-    internal static class MessageReceiveModeTranslator
-    {
-        public static ReceiveMode TranslateReceiveModeConfigurationValueToAzureServiceBusValue(MessageReceiveMode messageReceiveMode)
-        {
+using Microsoft.Azure.ServiceBus;
+
+namespace Obvs.AzureServiceBus.Configuration {
+    internal static class ReceiveModeTranslator {
+        public static ReceiveMode TranslateReceiveModeConfigurationValueToAzureServiceBusValue(ReceiveMode messageReceiveMode) {
             ReceiveMode result;
 
-            switch(messageReceiveMode)
-            {
-                case MessageReceiveMode.PeekLock:
-                    result = Microsoft.ServiceBus.Messaging.ReceiveMode.PeekLock;
+            switch (messageReceiveMode) {
+                case ReceiveMode.PeekLock:
+                    result = ReceiveMode.PeekLock;
 
                     break;
 
-                case MessageReceiveMode.ReceiveAndDelete:
-                    result = Microsoft.ServiceBus.Messaging.ReceiveMode.ReceiveAndDelete;
+                case ReceiveMode.ReceiveAndDelete:
+                    result = ReceiveMode.ReceiveAndDelete;
 
                     break;
 
                 default:
-                    throw new ArgumentOutOfRangeException("configurationReceiveMode", "Unexpected MessageReceiveMode value specified: " + messageReceiveMode.ToString());
+                    throw new ArgumentOutOfRangeException("configurationReceiveMode", "Unexpected ReceiveMode value specified: " + messageReceiveMode.ToString());
             }
 
             return result;
         }
 
-        public static MessageReceiveMode TranslateAzureServiceBusReceiveModeValueToConfigurationValue(Microsoft.ServiceBus.Messaging.ReceiveMode azureServiceBusReceiveMode)
-        {
-            MessageReceiveMode result;
+        public static ReceiveMode TranslateAzureServiceBusReceiveModeValueToConfigurationValue(ReceiveMode azureServiceBusReceiveMode) {
+            ReceiveMode result;
 
-            switch(azureServiceBusReceiveMode)
-            {
-                case Microsoft.ServiceBus.Messaging.ReceiveMode.PeekLock:
-                    result = MessageReceiveMode.PeekLock;
+            switch (azureServiceBusReceiveMode) {
+                case ReceiveMode.PeekLock:
+                    result = ReceiveMode.PeekLock;
 
                     break;
 
-                case Microsoft.ServiceBus.Messaging.ReceiveMode.ReceiveAndDelete:
-                    result = MessageReceiveMode.ReceiveAndDelete;
+                case ReceiveMode.ReceiveAndDelete:
+                    result = ReceiveMode.ReceiveAndDelete;
 
                     break;
 

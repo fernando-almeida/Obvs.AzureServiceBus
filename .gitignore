@@ -230,3 +230,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 /packages
+
+# VS Code
+.vscode
+*.code-workspace

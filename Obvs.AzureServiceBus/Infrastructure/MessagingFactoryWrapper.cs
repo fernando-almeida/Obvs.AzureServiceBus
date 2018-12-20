@@ -1,29 +1,36 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Microsoft.ServiceBus.Messaging;
+
+using Microsoft.Azure.ServiceBus;
+using Microsoft.Azure.ServiceBus.Core;
+
 using Obvs.AzureServiceBus.Configuration;
 
-namespace Obvs.AzureServiceBus.Infrastructure
-{
-    internal sealed class MessagingFactoryWrapper : IMessagingFactory
-    {
-        private readonly MessagingFactory _messagingFactory;
+namespace Obvs.AzureServiceBus.Infrastructure {
 
-        public MessagingFactoryWrapper(MessagingFactory messagingFactory)
-        {
-            _messagingFactory = messagingFactory;
+    /// <summary>
+    /// Messaging factory wrapper
+    /// </summary>
+    internal sealed class MessagingFactoryWrapper : IMessagingFactory {
+        private readonly string _namespaceConnectionString;
+
+        public MessagingFactoryWrapper(string namespaceConnectionString) {
+            if (string.IsNullOrEmpty(namespaceConnectionString)) {
+                throw new ArgumentNullException(nameof(namespaceConnectionString));
+            }
+            _namespaceConnectionString = namespaceConnectionString;
         }
 
-        public IMessageSender CreateMessageSender(Type messageType, string entityPath)
-        {
-            return new MessageSenderWrapper(messageType, _messagingFactory.CreateMessageSender(entityPath));
+        public IMessageSender CreateMessageSender(Type messageType, string entityPath) {
+            var messageSender = new MessageSender(_namespaceConnectionString, entityPath);
+            return new MessageSenderWrapper(messageType, messageSender);
         }
 
-        public IMessageReceiver CreateMessageReceiver(Type messageType, string entityPath, MessageReceiveMode receiveMode)
-        {
-            return new MessageReceiverWrapper(messageType, _messagingFactory.CreateMessageReceiver(entityPath, MessageReceiveModeTranslator.TranslateReceiveModeConfigurationValueToAzureServiceBusValue(receiveMode)));
-        }       
+        public IMessageReceiver CreateMessageReceiver(Type messageType, string entityPath, ReceiveMode receiveMode) {
+            var messageReceiver = new MessageReceiver(_namespaceConnectionString, entityPath, receiveMode);
+            return new MessageReceiverWrapper(messageType, messageReceiver);
+        }
     }
 }

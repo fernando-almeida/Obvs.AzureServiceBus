@@ -3,26 +3,28 @@ using System.Collections.Generic;
 using System.Reactive.Linq;
 using System.Reactive.Threading.Tasks;
 using System.Threading.Tasks;
+
 using FluentAssertions;
-using Microsoft.ServiceBus;
-using Microsoft.ServiceBus.Messaging;
+
+using Microsoft.Azure.ServiceBus;
+using Microsoft.Azure.ServiceBus.Core;
+
 using Moq;
+
 using Obvs.AzureServiceBus.Configuration;
 using Obvs.AzureServiceBus.Infrastructure;
 using Obvs.Configuration;
 using Obvs.MessageProperties;
 using Obvs.Serialization;
 using Obvs.Types;
+
 using Xunit;
 
-namespace Obvs.AzureServiceBus.Tests
-{
-    public class MessagingEntityVerifierFacts
-    {
+namespace Obvs.AzureServiceBus.Tests {
+    public class MessagingEntityVerifierFacts {
         private readonly Mock<INamespaceManager> _mockNamespaceManager;
 
-        public MessagingEntityVerifierFacts()
-        {
+        public MessagingEntityVerifierFacts() {
             _mockNamespaceManager = new Mock<INamespaceManager>();
             _mockNamespaceManager.Setup(nsm => nsm.QueueExists(It.IsAny<string>()))
                 .Returns(true);
@@ -32,11 +34,9 @@ namespace Obvs.AzureServiceBus.Tests
                 .Returns(true);
         }
 
-        public class ExistingMessageTypeMessagingEntitiesFacts : MessagingEntityVerifierFacts
-        {
+        public class ExistingMessageTypeMessagingEntitiesFacts : MessagingEntityVerifierFacts {
             [Fact]
-            public void VerifyExistingMessagingEntityThatDoesNotExistShouldThrow()
-            {
+            public void VerifyExistingMessagingEntityThatDoesNotExistShouldThrow() {
                 _mockNamespaceManager.Setup(nsm => nsm.QueueExists("commands"))
                     .Returns(false);
 
@@ -44,56 +44,51 @@ namespace Obvs.AzureServiceBus.Tests
 
                 Action action = () => messagingEntityVerifier.EnsureMessagingEntitiesExist(new [] { new MessageTypeMessagingEntityMappingDetails(typeof(ICommand), "commands", MessagingEntityType.Queue, MessagingEntityCreationOptions.VerifyAlreadyExists) });
 
-                var exceptionAssertion = action.ShouldThrow<MessagingEntityDoesNotAlreadyExistException>();
+                var exceptionAssertion = action.Should().Throw<MessagingEntityDoesNotAlreadyExistException>();
 
                 exceptionAssertion.And.Path.Should().Be("commands");
                 exceptionAssertion.And.MessagingEntityType.Should().Be(MessagingEntityType.Queue);
             }
 
             [Fact]
-            public void UseExistingMessagingEntityShouldNotTryToCreateTheMessagingEntity()
-            {
+            public void UseExistingMessagingEntityShouldNotTryToCreateTheMessagingEntity() {
                 _mockNamespaceManager.Setup(nsm => nsm.QueueExists("commands"))
                     .Returns(true);
 
                 MessagingEntityVerifier messagingEntityVerifier = new MessagingEntityVerifier(_mockNamespaceManager.Object);
 
-                messagingEntityVerifier.EnsureMessagingEntitiesExist(new[] { new MessageTypeMessagingEntityMappingDetails(typeof(ICommand), "commands", MessagingEntityType.Queue, MessagingEntityCreationOptions.CreateIfDoesntExist) });
+                messagingEntityVerifier.EnsureMessagingEntitiesExist(new [] { new MessageTypeMessagingEntityMappingDetails(typeof(ICommand), "commands", MessagingEntityType.Queue, MessagingEntityCreationOptions.CreateIfDoesntExist) });
 
                 _mockNamespaceManager.Verify(nsm => nsm.QueueExists("commands"), Times.Once());
                 _mockNamespaceManager.Verify(nsm => nsm.CreateQueue("commands"), Times.Never());
             }
         }
 
-        public class TemporaryMessagingEntityFacts : MessagingEntityVerifierFacts
-        {
+        public class TemporaryMessagingEntityFacts : MessagingEntityVerifierFacts {
             [Fact]
-            public void UseTemporaryMessagingEntityThatAlreadyExistsWithoutSpecifyingCanDeleteIfAlreadyExistsShouldThrow()
-            {
+            public void UseTemporaryMessagingEntityThatAlreadyExistsWithoutSpecifyingCanDeleteIfAlreadyExistsShouldThrow() {
                 MessagingEntityVerifier messagingEntityVerifier = new MessagingEntityVerifier(_mockNamespaceManager.Object);
 
-                Action action = () => messagingEntityVerifier.EnsureMessagingEntitiesExist(new[] { new MessageTypeMessagingEntityMappingDetails(typeof(ICommand), "commands", MessagingEntityType.Queue, MessagingEntityCreationOptions.CreateIfDoesntExist | MessagingEntityCreationOptions.CreateAsTemporary) });
+                Action action = () => messagingEntityVerifier.EnsureMessagingEntitiesExist(new [] { new MessageTypeMessagingEntityMappingDetails(typeof(ICommand), "commands", MessagingEntityType.Queue, MessagingEntityCreationOptions.CreateIfDoesntExist | MessagingEntityCreationOptions.CreateAsTemporary) });
 
-                var exceptionAssertion = action.ShouldThrow<Obvs.AzureServiceBus.Configuration.MessagingEntityAlreadyExistsException>();
+                var exceptionAssertion = action.Should().Throw<Obvs.AzureServiceBus.Configuration.MessagingEntityAlreadyExistsException>();
 
                 exceptionAssertion.And.Path.Should().Be("commands");
                 exceptionAssertion.And.MessagingEntityType.Should().Be(MessagingEntityType.Queue);
             }
 
             [Fact]
-            public void UseTemporaryMessagingEntityThatAlreadyExiststSpecifyingRecreateOptionShouldRecreate()
-            {
+            public void UseTemporaryMessagingEntityThatAlreadyExiststSpecifyingRecreateOptionShouldRecreate() {
                 MessagingEntityVerifier messagingEntityVerifier = new MessagingEntityVerifier(_mockNamespaceManager.Object);
 
-                messagingEntityVerifier.EnsureMessagingEntitiesExist(new[] { new MessageTypeMessagingEntityMappingDetails(typeof(ICommand), "commands", MessagingEntityType.Queue, MessagingEntityCreationOptions.CreateIfDoesntExist | MessagingEntityCreationOptions.CreateAsTemporary | MessagingEntityCreationOptions.RecreateExistingTemporary) });
+                messagingEntityVerifier.EnsureMessagingEntitiesExist(new [] { new MessageTypeMessagingEntityMappingDetails(typeof(ICommand), "commands", MessagingEntityType.Queue, MessagingEntityCreationOptions.CreateIfDoesntExist | MessagingEntityCreationOptions.CreateAsTemporary | MessagingEntityCreationOptions.RecreateExistingTemporary) });
 
                 _mockNamespaceManager.Verify(nsm => nsm.DeleteQueue("commands"), Times.Once());
                 _mockNamespaceManager.Verify(nsm => nsm.CreateQueue("commands"), Times.Once());
             }
 
             [Fact]
-            public void UseTemporarySubscriptionForTopicThatAlreadyExistsShouldCreateSubscription()
-            {
+            public void UseTemporarySubscriptionForTopicThatAlreadyExistsShouldCreateSubscription() {
                 _mockNamespaceManager.Setup(nsm => nsm.TopicExists("events"))
                     .Returns(true);
 
@@ -102,15 +97,14 @@ namespace Obvs.AzureServiceBus.Tests
 
                 MessagingEntityVerifier messagingEntityVerifier = new MessagingEntityVerifier(_mockNamespaceManager.Object);
 
-                messagingEntityVerifier.EnsureMessagingEntitiesExist(new[] { new MessageTypeMessagingEntityMappingDetails(typeof(IEvent), "events/subscriptions/test-subscription", MessagingEntityType.Subscription, MessagingEntityCreationOptions.CreateIfDoesntExist | MessagingEntityCreationOptions.CreateAsTemporary | MessagingEntityCreationOptions.RecreateExistingTemporary) });
+                messagingEntityVerifier.EnsureMessagingEntitiesExist(new [] { new MessageTypeMessagingEntityMappingDetails(typeof(IEvent), "events/subscriptions/test-subscription", MessagingEntityType.Subscription, MessagingEntityCreationOptions.CreateIfDoesntExist | MessagingEntityCreationOptions.CreateAsTemporary | MessagingEntityCreationOptions.RecreateExistingTemporary) });
 
                 _mockNamespaceManager.Verify(nsm => nsm.TopicExists("events"), Times.Once());
                 _mockNamespaceManager.Verify(nsm => nsm.CreateSubscription("events", "test-subscription"), Times.Once());
             }
 
             [Fact]
-            public void UseTemporarySubscriptionForTopicThatDoesntAlreadyExistThrows()
-            {
+            public void UseTemporarySubscriptionForTopicThatDoesntAlreadyExistThrows() {
                 _mockNamespaceManager.Setup(nsm => nsm.TopicExists("events"))
                     .Returns(false);
 
@@ -119,17 +113,16 @@ namespace Obvs.AzureServiceBus.Tests
 
                 MessagingEntityVerifier messagingEntityVerifier = new MessagingEntityVerifier(_mockNamespaceManager.Object);
 
-                Action action = () => messagingEntityVerifier.EnsureMessagingEntitiesExist(new[] { new MessageTypeMessagingEntityMappingDetails(typeof(IEvent), "events/subscriptions/test-subscription", MessagingEntityType.Subscription, MessagingEntityCreationOptions.CreateIfDoesntExist | MessagingEntityCreationOptions.CreateAsTemporary) });
+                Action action = () => messagingEntityVerifier.EnsureMessagingEntitiesExist(new [] { new MessageTypeMessagingEntityMappingDetails(typeof(IEvent), "events/subscriptions/test-subscription", MessagingEntityType.Subscription, MessagingEntityCreationOptions.CreateIfDoesntExist | MessagingEntityCreationOptions.CreateAsTemporary) });
 
-                var exceptionAssertion = action.ShouldThrow<MessagingEntityDoesNotAlreadyExistException>();
+                var exceptionAssertion = action.Should().Throw<MessagingEntityDoesNotAlreadyExistException>();
 
                 exceptionAssertion.And.Path.Should().Be("events");
                 exceptionAssertion.And.MessagingEntityType.Should().Be(MessagingEntityType.Topic);
             }
 
             [Fact]
-            public void UseTemporarySubscriptionForTemporaryTopicShouldCreateTopicAndSubscription()
-            {
+            public void UseTemporarySubscriptionForTemporaryTopicShouldCreateTopicAndSubscription() {
                 _mockNamespaceManager.Setup(nsm => nsm.TopicExists("events"))
                     .Returns(false);
 
@@ -138,10 +131,9 @@ namespace Obvs.AzureServiceBus.Tests
 
                 MessagingEntityVerifier messagingEntityVerifier = new MessagingEntityVerifier(_mockNamespaceManager.Object);
 
-                messagingEntityVerifier.EnsureMessagingEntitiesExist(new[]
-                {
+                messagingEntityVerifier.EnsureMessagingEntitiesExist(new [] {
                     new MessageTypeMessagingEntityMappingDetails(typeof(IEvent), "events", MessagingEntityType.Topic, MessagingEntityCreationOptions.CreateIfDoesntExist | MessagingEntityCreationOptions.CreateAsTemporary),
-                    new MessageTypeMessagingEntityMappingDetails(typeof(IEvent), "events/subscriptions/test-subscription", MessagingEntityType.Subscription, MessagingEntityCreationOptions.CreateIfDoesntExist | MessagingEntityCreationOptions.CreateAsTemporary)
+                        new MessageTypeMessagingEntityMappingDetails(typeof(IEvent), "events/subscriptions/test-subscription", MessagingEntityType.Subscription, MessagingEntityCreationOptions.CreateIfDoesntExist | MessagingEntityCreationOptions.CreateAsTemporary)
                 });
 
                 _mockNamespaceManager.Verify(nsm => nsm.CreateTopic("events"), Times.Once());
@@ -149,8 +141,7 @@ namespace Obvs.AzureServiceBus.Tests
             }
 
             [Fact]
-            public void UseTemporarySubscriptionThatAlreadyExistsShouldRecreateSubscription()
-            {
+            public void UseTemporarySubscriptionThatAlreadyExistsShouldRecreateSubscription() {
                 _mockNamespaceManager.Setup(nsm => nsm.TopicExists("events"))
                     .Returns(true);
 
@@ -159,7 +150,7 @@ namespace Obvs.AzureServiceBus.Tests
 
                 MessagingEntityVerifier messagingEntityVerifier = new MessagingEntityVerifier(_mockNamespaceManager.Object);
 
-                messagingEntityVerifier.EnsureMessagingEntitiesExist(new[] { new MessageTypeMessagingEntityMappingDetails(typeof(IEvent), "events/subscriptions/test-subscription", MessagingEntityType.Subscription, MessagingEntityCreationOptions.CreateAsTemporary | MessagingEntityCreationOptions.RecreateExistingTemporary) });
+                messagingEntityVerifier.EnsureMessagingEntitiesExist(new [] { new MessageTypeMessagingEntityMappingDetails(typeof(IEvent), "events/subscriptions/test-subscription", MessagingEntityType.Subscription, MessagingEntityCreationOptions.CreateAsTemporary | MessagingEntityCreationOptions.RecreateExistingTemporary) });
 
                 _mockNamespaceManager.Verify(nsm => nsm.DeleteSubscription("events", "test-subscription"), Times.Once());
                 _mockNamespaceManager.Verify(nsm => nsm.CreateSubscription("events", "test-subscription"), Times.Once());

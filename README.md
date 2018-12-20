@@ -17,7 +17,7 @@ The following Azure ServiceBus messaging entities are currently supported by thi
 ### Peek-Lock Message Control
 As of Obvs 3.x, the library offers no out-of-the-box control over peek-lock style messages like those you might receive from Azure Service Bus. 
 Therefore this library offers a small API-subset that is designed to be agnostic of Azure Service Bus at the surface level, yet gives you the 
-full control you would expect over peek-lock style messages as if you were working with Azure Service Bus's `BrokeredMessage` class directly.
+full control you would expect over peek-lock style messages as if you were working with Azure Service Bus's `Message` class directly.
 
 **Please note:** you *must* opt-in to `PeekLock` mode as the default is `ReceiveAndDelete`. This is to stay consistent with the Azure Service Bus API itself.
 
@@ -72,7 +72,7 @@ var serviceBusClient = ServiceBus<MyMessage, MyCommand, MyEvent, MyRequest, MyRe
                 .WithAzureServiceBusEndpoint()
                 .Named("My Service Bus")
                 .WithConnectionString(ConfigurationManager.AppSettings["MyServiceBusConnectionString"])
-                .UsingSubscriptionFor<MyEvent>("my-events", "my-subscription", MessageReceiveMode.PeekLock)
+                .UsingSubscriptionFor<MyEvent>("my-events", "my-subscription", ReceiveMode.PeekLock)
                 .SerializedAsJson()
                 .AsClient()
                 .CreateServiceBusClient();

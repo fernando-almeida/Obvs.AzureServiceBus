@@ -11,7 +11,7 @@
         <copyright>Copyright 2015</copyright>
         <tags>Azure Commands Events CQRS Rx Observable</tags>
         <releaseNotes>
-            FIX: fixing bug outgoing message properties were not actually being applied to the outgoing BrokeredMessage.
+            FIX: fixing bug outgoing message properties were not actually being applied to the outgoing Message.
         </releaseNotes>
     </metadata>
 </package>

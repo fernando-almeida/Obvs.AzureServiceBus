@@ -1,25 +1,20 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
-using Microsoft.ServiceBus.Messaging;
 
-namespace Obvs.AzureServiceBus.Infrastructure
-{
-    public interface IMessagePropertiesProvider
-    {
+using Microsoft.Azure.ServiceBus;
+
+namespace Obvs.AzureServiceBus.Infrastructure {
+    public interface IMessagePropertiesProvider {
         IIncomingMessageProperties GetIncomingMessageProperties(object message);
         IOutgoingMessageProperties GetOutgoingMessageProperties(object message);
     }
 
-    internal static class MessagePropertiesProvider
-    {
+    internal static class MessagePropertiesProvider {
         private static IMessagePropertiesProvider Instance;
 
-        public static IMessagePropertiesProvider ConfiguredInstance
-        {
-            get
-            {
-                if(Instance == null)
-                {
+        public static IMessagePropertiesProvider ConfiguredInstance {
+            get {
+                if (Instance == null) {
                     UseDefault();
                 }
 
@@ -27,30 +22,26 @@ namespace Obvs.AzureServiceBus.Infrastructure
             }
         }
 
-        public static void Use(IMessagePropertiesProvider messagePropertiesProvider)
-        {
+        public static void Use(IMessagePropertiesProvider messagePropertiesProvider) {
             Instance = messagePropertiesProvider;
         }
 
-        public static void UseDefault() => Use(new DefaultMessagePropertiesProvider(MessageBrokeredMessageTable.ConfiguredInstance, MessageOutgoingPropertiesTable.ConfiguredInstance));
+        public static void UseDefault() => Use(new DefaultMessagePropertiesProvider(MessageMessageTable.ConfiguredInstance, MessageOutgoingPropertiesTable.ConfiguredInstance));
 
         public static void UseFakeMessagePropertiesProvider() => Use(new FakeMessagePropertiesProvider());
     }
 
-    internal class FakeMessagePropertiesProvider : IMessagePropertiesProvider
-    {
+    internal class FakeMessagePropertiesProvider : IMessagePropertiesProvider {
         private static readonly ConditionalWeakTable<object, Tuple<FakeIncomingMessageProperties, FakeOutgoingMessageProperties>> _trackedMessagePropertiesTable = new ConditionalWeakTable<object, Tuple<FakeIncomingMessageProperties, FakeOutgoingMessageProperties>>();
 
         public IIncomingMessageProperties GetIncomingMessageProperties(object message) => GetTrackedMessageProperties(message).Item1;
 
         public IOutgoingMessageProperties GetOutgoingMessageProperties(object message) => GetTrackedMessageProperties(message).Item2;
 
-        private Tuple<FakeIncomingMessageProperties, FakeOutgoingMessageProperties> GetTrackedMessageProperties(object message)
-        {
+        private Tuple<FakeIncomingMessageProperties, FakeOutgoingMessageProperties> GetTrackedMessageProperties(object message) {
             Tuple<FakeIncomingMessageProperties, FakeOutgoingMessageProperties> messageProperties;
 
-            if(!_trackedMessagePropertiesTable.TryGetValue(message, out messageProperties))
-            {
+            if (!_trackedMessagePropertiesTable.TryGetValue(message, out messageProperties)) {
                 messageProperties = new Tuple<FakeIncomingMessageProperties, FakeOutgoingMessageProperties>(new FakeIncomingMessageProperties(), new FakeOutgoingMessageProperties());
 
                 _trackedMessagePropertiesTable.Add(message, messageProperties);
@@ -59,55 +50,45 @@ namespace Obvs.AzureServiceBus.Infrastructure
             return messageProperties;
         }
 
-        private sealed class FakeOutgoingMessageProperties : IOutgoingMessageProperties
-        {
-            public DateTime ScheduledEnqueueTimeUtc
-            {
+        private sealed class FakeOutgoingMessageProperties : IOutgoingMessageProperties {
+            public DateTime ScheduledEnqueueTimeUtc {
                 get;
                 set;
             }
 
-            public TimeSpan TimeToLive
-            {
+            public TimeSpan TimeToLive {
                 get;
                 set;
             }
         }
 
-        private sealed class FakeIncomingMessageProperties : IIncomingMessageProperties
-        {
-            public int DeliveryCount
-            {
-                get
-                {
+        private sealed class FakeIncomingMessageProperties : IIncomingMessageProperties {
+            public int DeliveryCount {
+                get {
                     return 1;
                 }
             }
         }
     }
 
-    internal sealed class DefaultMessagePropertiesProvider : IMessagePropertiesProvider
-    {
-        private IMessageBrokeredMessageTable _messageBrokeredMessageTable;
+    internal sealed class DefaultMessagePropertiesProvider : IMessagePropertiesProvider {
+        private IMessageMessageTable _messageMessageTable;
         private IMessageOutgoingPropertiesTable _messageOutgoingPropertiesTable;
 
-        public DefaultMessagePropertiesProvider(IMessageBrokeredMessageTable messageBrokeredMessageTable, IMessageOutgoingPropertiesTable messageOutgoingPropertiesTable)
-        {
-            _messageBrokeredMessageTable = messageBrokeredMessageTable;
+        public DefaultMessagePropertiesProvider(IMessageMessageTable messageMessageTable, IMessageOutgoingPropertiesTable messageOutgoingPropertiesTable) {
+            _messageMessageTable = messageMessageTable;
             _messageOutgoingPropertiesTable = messageOutgoingPropertiesTable;
         }
 
-        public IIncomingMessageProperties GetIncomingMessageProperties(object message) => new DefaultBrokeredMessageIncomingMessageProperties(_messageBrokeredMessageTable.GetBrokeredMessageForMessage(message));
+        public IIncomingMessageProperties GetIncomingMessageProperties(object message) => new DefaultMessageIncomingMessageProperties(_messageMessageTable.GetMessageForObject(message));
 
-        public IOutgoingMessageProperties GetOutgoingMessageProperties(object message)
-        {
+        public IOutgoingMessageProperties GetOutgoingMessageProperties(object message) {
             IOutgoingMessageProperties result;
 
             result = _messageOutgoingPropertiesTable.GetOutgoingPropertiesForMessage(message);
 
-            if(result == null)
-            {
-                result = new DefaultBrokeredMessageOutgoingMessageProperties();
+            if (result == null) {
+                result = new DefaultMessageOutgoingMessageProperties();
 
                 _messageOutgoingPropertiesTable.SetOutgoingPropertiesForMessage(message, result);
             }
@@ -116,62 +97,51 @@ namespace Obvs.AzureServiceBus.Infrastructure
         }
     }
 
-    public interface IIncomingMessageProperties
-    {
-        int DeliveryCount
-        {
+    public interface IIncomingMessageProperties {
+        int DeliveryCount {
             get;
         }
     }
 
-    public interface IOutgoingMessageProperties
-    {
-        DateTime ScheduledEnqueueTimeUtc
-        {
+    public interface IOutgoingMessageProperties {
+        DateTime ScheduledEnqueueTimeUtc {
             get;
             set;
         }
 
-        TimeSpan TimeToLive
-        {
+        TimeSpan TimeToLive {
             get;
             set;
         }
     }
 
-    internal sealed class DefaultBrokeredMessageIncomingMessageProperties : IIncomingMessageProperties
-    {
-        private readonly BrokeredMessage _brokeredMessage;
+    internal sealed class DefaultMessageIncomingMessageProperties : IIncomingMessageProperties {
+        private readonly Message _message;
 
-        public DefaultBrokeredMessageIncomingMessageProperties(BrokeredMessage brokeredMessage)
-        {
-            _brokeredMessage = brokeredMessage;
+        public DefaultMessageIncomingMessageProperties(Message message) {
+            _message = message;
         }
 
-        public int DeliveryCount
-        {
-            get
-            {
-                return _brokeredMessage.DeliveryCount;
+        public int DeliveryCount {
+            get {
+                return _message.SystemProperties.DeliveryCount;
             }
         }
     }
 
-    internal sealed class DefaultBrokeredMessageOutgoingMessageProperties : IOutgoingMessageProperties
-    {
-        public DefaultBrokeredMessageOutgoingMessageProperties()
-        {
+    internal sealed class DefaultMessageOutgoingMessageProperties : IOutgoingMessageProperties {
+        public DefaultMessageOutgoingMessageProperties() {
 
         }
 
-        public DateTime ScheduledEnqueueTimeUtc
-        {
-            get; set;
+        public DateTime ScheduledEnqueueTimeUtc {
+            get;
+            set;
         }
 
-        public TimeSpan TimeToLive
-        {
-            get; set;
+        public TimeSpan TimeToLive {
+            get;
+            set;
         }
     }
 }

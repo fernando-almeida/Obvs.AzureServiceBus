@@ -1,16 +1,16 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
-using Microsoft.ServiceBus.Messaging;
 
-namespace Obvs.AzureServiceBus.Infrastructure
-{
-    public interface IMessageSender : IDisposable
-    {
-        Type SupportedMessageType
-        {
-            get;
-        }
+using Microsoft.Azure.ServiceBus;
 
-        Task SendAsync(BrokeredMessage brokeredMessage);
+namespace Obvs.AzureServiceBus.Infrastructure {
+
+    /// <summary>
+    /// Message sender
+    /// </summary>
+    public interface IMessageSender : IDisposable {
+        Type SupportedMessageType { get; }
+
+        Task SendAsync(Message Message);
     }
 }

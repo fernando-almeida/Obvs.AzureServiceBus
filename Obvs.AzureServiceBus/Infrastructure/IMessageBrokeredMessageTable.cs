@@ -1,52 +1,45 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
-using Microsoft.ServiceBus.Messaging;
 
-namespace Obvs.AzureServiceBus.Infrastructure
-{
-    internal interface IMessageBrokeredMessageTable
-    {
-        void SetBrokeredMessageForMessage(object message, BrokeredMessage brokeredMessage);
+using Microsoft.Azure.ServiceBus;
 
-        BrokeredMessage GetBrokeredMessageForMessage(object message);
+namespace Obvs.AzureServiceBus.Infrastructure {
+    internal interface IMessageMessageTable {
+        void SetMessageForObject(object obj, Message message);
 
-        void RemoveBrokeredMessageForMessage(object message);
+        Message GetMessageForObject(object message);
+
+        void RemoveMessageForMessage(object message);
     }
 
-    internal sealed class MessageBrokeredMessageTable
-    {
-        private static readonly IMessageBrokeredMessageTable Instance = new DefaultMessageBrokeredMessageTable();
+    internal sealed class MessageMessageTable {
+        private static readonly IMessageMessageTable Instance = new DefaultMessageMessageTable();
 
-        public static IMessageBrokeredMessageTable ConfiguredInstance
-        {
-            get
-            {
+        public static IMessageMessageTable ConfiguredInstance {
+            get {
                 return Instance;
             }
         }
     }
 
-    internal sealed class DefaultMessageBrokeredMessageTable : IMessageBrokeredMessageTable
-    {
-        ConditionalWeakTable<object, BrokeredMessage> _innerTable = new ConditionalWeakTable<object, BrokeredMessage>();
+    internal sealed class DefaultMessageMessageTable : IMessageMessageTable {
+        ConditionalWeakTable<object, Message> _innerTable = new ConditionalWeakTable<object, Message>();
 
-        public void SetBrokeredMessageForMessage(object message, BrokeredMessage brokeredMessage)
-        {
-            if(message == null) throw new ArgumentNullException(nameof(message));
-            if(brokeredMessage == null) throw new ArgumentNullException(nameof(brokeredMessage));
+        public void SetMessageForObject(object obj, Message message) {
+            if (message == null) throw new ArgumentNullException(nameof(message));
+            if (message == null) throw new ArgumentNullException(nameof(message));
 
-            _innerTable.Add(message, brokeredMessage);
+            _innerTable.Add(obj, message);
         }
 
-        public BrokeredMessage GetBrokeredMessageForMessage(object message)
-        {
-            BrokeredMessage result;
+        public Message GetMessageForObject(object message) {
+            Message result;
 
             _innerTable.TryGetValue(message, out result);
 
             return result;
         }
 
-        public void RemoveBrokeredMessageForMessage(object message) => _innerTable.Remove(message);
+        public void RemoveMessageForMessage(object message) => _innerTable.Remove(message);
     }
 }

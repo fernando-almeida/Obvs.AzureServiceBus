@@ -37,7 +37,7 @@ namespace Obvs.AzureServiceBus.Tests
 
                 Action action = () => message.GetIncomingMessageProperties();
 
-                action.ShouldThrow<ArgumentNullException>()
+                action.Should().Throw<ArgumentNullException>()
                     .And.ParamName.Should().Be("message");
             }
 
@@ -67,7 +67,7 @@ namespace Obvs.AzureServiceBus.Tests
 
                 Action action = () => message.GetOutgoingMessageProperties();
 
-                action.ShouldThrow<ArgumentNullException>()
+                action.Should().Throw<ArgumentNullException>()
                     .And.ParamName.Should().Be("message");
             }
 

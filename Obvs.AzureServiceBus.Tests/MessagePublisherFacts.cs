@@ -3,71 +3,63 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+
 using FluentAssertions;
-using Microsoft.ServiceBus.Messaging;
+
+using Microsoft.Azure.ServiceBus;
+
 using Moq;
+
 using Obvs.AzureServiceBus.Infrastructure;
 using Obvs.MessageProperties;
 using Obvs.Serialization;
 using Obvs.Types;
+
 using Xunit;
 
-namespace Obvs.AzureServiceBus.Tests
-{
-    public class MessagePublisherFacts
-    {
-        public class ConstructorFacts
-        {
+namespace Obvs.AzureServiceBus.Tests {
+    public class MessagePublisherFacts {
+        public class ConstructorFacts {
             [Fact]
-            public void CreatingWithNullIMessageClientEntityFactorySenderThrows()
-            {
-                Action action = () =>
-                {
-                    new MessagePublisher<TestMessage>((IMessagingEntityFactory)null, Mock.Of<IMessageSerializer>(), Mock.Of<IMessagePropertyProvider<TestMessage>>(), Mock.Of<IMessageOutgoingPropertiesTable>());
+            public void CreatingWithNullIMessageClientEntityFactorySenderThrows() {
+                Action action = () => {
+                    new MessagePublisher<TestMessage>((IMessagingEntityFactory) null, Mock.Of<IMessageSerializer>(), Mock.Of<IMessagePropertyProvider<TestMessage>>(), Mock.Of<IMessageOutgoingPropertiesTable>());
                 };
 
-                action.ShouldThrow<ArgumentNullException>().Where(e => e.ParamName == "messagingEntityFactory");
+                action.Should().Throw<ArgumentNullException>().Where(e => e.ParamName == "messagingEntityFactory");
             }
 
             [Fact]
-            public void CreatingWithNullSerializerThrows()
-            {
-                Action action = () =>
-                {
+            public void CreatingWithNullSerializerThrows() {
+                Action action = () => {
                     new MessagePublisher<TestMessage>(Mock.Of<IMessagingEntityFactory>(), null, Mock.Of<IMessagePropertyProvider<TestMessage>>(), Mock.Of<IMessageOutgoingPropertiesTable>());
                 };
 
-                action.ShouldThrow<ArgumentNullException>().Where(e => e.ParamName == "serializer");
+                action.Should().Throw<ArgumentNullException>().Where(e => e.ParamName == "serializer");
             }
 
             [Fact]
-            public void CreatingWithNullPropertyProviderThrows()
-            {
-                Action action = () =>
-                {
+            public void CreatingWithNullPropertyProviderThrows() {
+                Action action = () => {
                     new MessagePublisher<TestMessage>(Mock.Of<IMessagingEntityFactory>(), Mock.Of<IMessageSerializer>(), null, Mock.Of<IMessageOutgoingPropertiesTable>());
                 };
 
-                action.ShouldThrow<ArgumentNullException>().Where(e => e.ParamName == "propertyProvider");
+                action.Should().Throw<ArgumentNullException>().Where(e => e.ParamName == "propertyProvider");
             }
 
             [Fact]
-            public void CreatingWithNullMessageOutgoingPropertiesTableThrows()
-            {
-                Action action = () =>
-                {
+            public void CreatingWithNullMessageOutgoingPropertiesTableThrows() {
+                Action action = () => {
                     new MessagePublisher<TestMessage>(Mock.Of<IMessagingEntityFactory>(), Mock.Of<IMessageSerializer>(), Mock.Of<IMessagePropertyProvider<TestMessage>>(), null);
                 };
 
-                action.ShouldThrow<ArgumentNullException>().Where(e => e.ParamName == "messageOutgoingPropertiesTable");
+                action.Should().Throw<ArgumentNullException>().Where(e => e.ParamName == "messageOutgoingPropertiesTable");
             }
         }
 
-        public class MessagePublishingFacts
-        {
+        public class MessagePublishingFacts {
             [Fact]
-            public void SerializesMessage()
-            {
+            public void SerializesMessage() {
                 Mock<IMessageSerializer> mockMessageSerializer = new Mock<IMessageSerializer>();
 
                 MessagePublisher<TestMessage> messagePublisher = new MessagePublisher<TestMessage>(Mock.Of<IMessagingEntityFactory>(), mockMessageSerializer.Object, Mock.Of<IMessagePropertyProvider<TestMessage>>(), Mock.Of<IMessageOutgoingPropertiesTable>());
@@ -80,15 +72,13 @@ namespace Obvs.AzureServiceBus.Tests
             }
 
             [Fact]
-            public async Task GetsMessagePropertiesFromPropertyProviderAndAppliesThemToTheBrokeredMessage()
-            {
+            public async Task GetsMessagePropertiesFromPropertyProviderAndAppliesThemToTheMessage() {
                 Mock<IMessageSender> mockMessageSender = new Mock<IMessageSender>();
-                BrokeredMessage brokeredMessageSent = null;
+                Message MessageSent = null;
 
-                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<BrokeredMessage>()))
-                    .Callback<BrokeredMessage>(bm =>
-                    {
-                        brokeredMessageSent = bm;
+                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<Message>()))
+                    .Callback<Message>(bm => {
+                        MessageSent = bm;
                     })
                     .Returns(Task.FromResult<object>(null));
 
@@ -100,8 +90,7 @@ namespace Obvs.AzureServiceBus.Tests
 
                 Mock<IMessagePropertyProvider<TestMessage>> mockMessagePropertyProvider = new Mock<IMessagePropertyProvider<TestMessage>>();
 
-                KeyValuePair<string, object>[] properties = new[]
-                {
+                KeyValuePair<string, object>[] properties = new [] {
                     new KeyValuePair<string, object>("Prop1", 1),
                     new KeyValuePair<string, object>("Prop2", "two"),
                 };
@@ -117,23 +106,21 @@ namespace Obvs.AzureServiceBus.Tests
 
                 mockMessagePropertyProvider.Verify(mpp => mpp.GetProperties(It.Is<TestMessage>(it => Object.ReferenceEquals(it, message))), Times.Once());
 
-                brokeredMessageSent.Should().NotBeNull();
+                MessageSent.Should().NotBeNull();
 
                 // TODO: should be able to do this cleaner
-                brokeredMessageSent.Properties.Should().ContainKeys(properties.Select(kvp => kvp.Key), "Should have translated all properties provided by the property provider to the BrokeredMessage.");
-                brokeredMessageSent.Properties.Should().ContainValues(properties.Select(kvp => kvp.Value), "Should have translated all properties provided by the property provider to the BrokeredMessage.");
+                MessageSent.UserProperties.Should().ContainKeys(properties.Select(kvp => kvp.Key), "Should have translated all properties provided by the property provider to the Message.");
+                MessageSent.UserProperties.Should().ContainValues(properties.Select(kvp => kvp.Value), "Should have translated all properties provided by the property provider to the Message.");
             }
 
             [Fact]
-            public async Task AppliesMessageTypeNamePropertyToTheBrokeredMessage()
-            {
+            public async Task AppliesMessageTypeNamePropertyToTheMessage() {
                 Mock<IMessageSender> mockMessageSender = new Mock<IMessageSender>();
-                BrokeredMessage brokeredMessageSent = null;
+                Message MessageSent = null;
 
-                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<BrokeredMessage>()))
-                    .Callback<BrokeredMessage>(bm =>
-                    {
-                        brokeredMessageSent = bm;
+                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<Message>()))
+                    .Callback<Message>(bm => {
+                        MessageSent = bm;
                     })
                     .Returns(Task.FromResult<object>(null));
 
@@ -151,14 +138,13 @@ namespace Obvs.AzureServiceBus.Tests
 
                 await messagePublisher.PublishAsync(message);
 
-                brokeredMessageSent.Should().NotBeNull();
+                MessageSent.Should().NotBeNull();
 
-                brokeredMessageSent.Properties.Should().Contain(new KeyValuePair<string,object>(MessagePropertyNames.TypeName, typeof(TestMessage).Name), "Should have applied the mesage type name property to the BrokeredMessage.");
+                MessageSent.UserProperties.Should().Contain(new KeyValuePair<string, object>(MessagePropertyNames.TypeName, typeof(TestMessage).Name), "Should have applied the mesage type name property to the Message.");
             }
 
             [Fact]
-            public async Task SendsMessage()
-            {
+            public async Task SendsMessage() {
                 Mock<IMessageSender> mockMessageSender = new Mock<IMessageSender>();
                 Mock<IMessagingEntityFactory> mockMessageClientEntityFactory = new Mock<IMessagingEntityFactory>();
                 mockMessageClientEntityFactory.Setup(mcef => mcef.CreateMessageSender(It.IsAny<Type>()))
@@ -170,12 +156,11 @@ namespace Obvs.AzureServiceBus.Tests
 
                 await messagePublisher.PublishAsync(message);
 
-                mockMessageSender.Verify(ms => ms.SendAsync(It.IsAny<BrokeredMessage>()), Times.Once());
+                mockMessageSender.Verify(ms => ms.SendAsync(It.IsAny<Message>()), Times.Once());
             }
 
             [Fact]
-            public async Task HandlesNoOutgoingPropertiesForMessage()
-            {
+            public async Task HandlesNoOutgoingPropertiesForMessage() {
                 Mock<IMessageSender> mockMessageSender = new Mock<IMessageSender>();
                 Mock<IMessagingEntityFactory> mockMessageClientEntityFactory = new Mock<IMessagingEntityFactory>();
                 mockMessageClientEntityFactory.Setup(mcef => mcef.CreateMessageSender(It.IsAny<Type>()))
@@ -192,17 +177,16 @@ namespace Obvs.AzureServiceBus.Tests
             }
 
             [Fact]
-            public async Task AppliesOutgoingPropertiesToMessage()
-            {
+            public async Task AppliesOutgoingPropertiesToMessage() {
                 Mock<IMessageSender> mockMessageSender = new Mock<IMessageSender>();
                 Mock<IMessagingEntityFactory> mockMessageClientEntityFactory = new Mock<IMessagingEntityFactory>();
                 mockMessageClientEntityFactory.Setup(mcef => mcef.CreateMessageSender(It.IsAny<Type>()))
                     .Returns(mockMessageSender.Object);
 
-                BrokeredMessage sentBrokeredMessage = null;
+                Message sentMessage = null;
 
-                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<BrokeredMessage>()))
-                    .Callback<BrokeredMessage>(bm => sentBrokeredMessage = bm)
+                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<Message>()))
+                    .Callback<Message>(bm => sentMessage = bm)
                     .Returns(Task.FromResult<object>(null));
 
                 TestMessage testMessage = new TestMessage();
@@ -229,24 +213,21 @@ namespace Obvs.AzureServiceBus.Tests
                 mockOutgoingMessageProperties.Verify(omp => omp.ScheduledEnqueueTimeUtc, Times.Once());
                 mockOutgoingMessageProperties.Verify(omp => omp.TimeToLive, Times.Once());
 
-                sentBrokeredMessage.ScheduledEnqueueTimeUtc.Should().Be(testScheduledEnqueueTime);
-                sentBrokeredMessage.TimeToLive.Should().Be(testTimeToLive);
+                sentMessage.ScheduledEnqueueTimeUtc.Should().Be(testScheduledEnqueueTime);
+                sentMessage.TimeToLive.Should().Be(testTimeToLive);
             }
         }
 
-        public class RequestResponseFacts
-        {
+        public class RequestResponseFacts {
             [Fact]
-            public async Task RequestWithNoRequestorIdOrRequestIdEndsUpWithNoCorrelationData()
-            {
+            public async Task RequestWithNoRequestorIdOrRequestIdEndsUpWithNoCorrelationData() {
                 Mock<IMessageSender> mockMessageSender = new Mock<IMessageSender>();
 
-                BrokeredMessage brokeredMessageSent = null;
+                Message MessageSent = null;
 
-                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<BrokeredMessage>()))
-                    .Callback<BrokeredMessage>(bm =>
-                    {
-                        brokeredMessageSent = bm;
+                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<Message>()))
+                    .Callback<Message>(bm => {
+                        MessageSent = bm;
                     })
                     .Returns(Task.FromResult<object>(null));
 
@@ -260,24 +241,22 @@ namespace Obvs.AzureServiceBus.Tests
 
                 await messagePublisher.PublishAsync(request);
 
-                mockMessageSender.Verify(ms => ms.SendAsync(It.IsAny<BrokeredMessage>()), Times.Once());
+                mockMessageSender.Verify(ms => ms.SendAsync(It.IsAny<Message>()), Times.Once());
 
-                brokeredMessageSent.Should().NotBeNull();
-                brokeredMessageSent.CorrelationId.Should().BeNull();
-                brokeredMessageSent.ReplyToSessionId.Should().BeNull();
+                MessageSent.Should().NotBeNull();
+                MessageSent.CorrelationId.Should().BeNull();
+                MessageSent.ReplyToSessionId.Should().BeNull();
             }
 
             [Fact]
-            public async Task RequestWithRequestIdEndsUpWithCorrelationId()
-            {
+            public async Task RequestWithRequestIdEndsUpWithCorrelationId() {
                 Mock<IMessageSender> mockMessageSender = new Mock<IMessageSender>();
 
-                BrokeredMessage brokeredMessageSent = null;
+                Message MessageSent = null;
 
-                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<BrokeredMessage>()))
-                    .Callback<BrokeredMessage>(bm =>
-                    {
-                        brokeredMessageSent = bm;
+                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<Message>()))
+                    .Callback<Message>(bm => {
+                        MessageSent = bm;
                     })
                     .Returns(Task.FromResult<object>(null));
 
@@ -287,30 +266,27 @@ namespace Obvs.AzureServiceBus.Tests
 
                 MessagePublisher<TestMessage> messagePublisher = new MessagePublisher<TestMessage>(mockMessageClientEntityFactory.Object, Mock.Of<IMessageSerializer>(), Mock.Of<IMessagePropertyProvider<TestMessage>>(), Mock.Of<IMessageOutgoingPropertiesTable>());
 
-                TestRequest request = new TestRequest
-                {
+                TestRequest request = new TestRequest {
                     RequestId = "TestRequestId"
                 };
 
                 await messagePublisher.PublishAsync(request);
 
-                mockMessageSender.Verify(ms => ms.SendAsync(It.IsAny<BrokeredMessage>()), Times.Once());
+                mockMessageSender.Verify(ms => ms.SendAsync(It.IsAny<Message>()), Times.Once());
 
-                brokeredMessageSent.Should().NotBeNull();
-                brokeredMessageSent.CorrelationId.Should().Be(request.RequestId);
+                MessageSent.Should().NotBeNull();
+                MessageSent.CorrelationId.Should().Be(request.RequestId);
             }
 
             [Fact]
-            public async Task RequestRequesterIdEndsUpAsReplyToSessionId()
-            {
+            public async Task RequestRequesterIdEndsUpAsReplyToSessionId() {
                 Mock<IMessageSender> mockMessageSender = new Mock<IMessageSender>();
 
-                BrokeredMessage brokeredMessageSent = null;
+                Message MessageSent = null;
 
-                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<BrokeredMessage>()))
-                    .Callback<BrokeredMessage>(bm =>
-                    {
-                        brokeredMessageSent = bm;
+                mockMessageSender.Setup(ms => ms.SendAsync(It.IsAny<Message>()))
+                    .Callback<Message>(bm => {
+                        MessageSent = bm;
                     })
                     .Returns(Task.FromResult<object>(null));
 
@@ -320,35 +296,30 @@ namespace Obvs.AzureServiceBus.Tests
 
                 MessagePublisher<TestMessage> messagePublisher = new MessagePublisher<TestMessage>(mockMessageClientEntityFactory.Object, Mock.Of<IMessageSerializer>(), Mock.Of<IMessagePropertyProvider<TestMessage>>(), Mock.Of<IMessageOutgoingPropertiesTable>());
 
-                TestRequest request = new TestRequest
-                {
+                TestRequest request = new TestRequest {
                     RequesterId = "TestRequesterId"
                 };
 
                 await messagePublisher.PublishAsync(request);
 
-                mockMessageSender.Verify(ms => ms.SendAsync(It.IsAny<BrokeredMessage>()), Times.Once());
+                mockMessageSender.Verify(ms => ms.SendAsync(It.IsAny<Message>()), Times.Once());
 
-                brokeredMessageSent.Should().NotBeNull();
-                brokeredMessageSent.ReplyToSessionId.Should().Be(request.RequesterId);
+                MessageSent.Should().NotBeNull();
+                MessageSent.ReplyToSessionId.Should().Be(request.RequesterId);
             }
         }
 
-        public class TestMessage : IMessage
-        {
+        public class TestMessage : IMessage {
 
         }
 
-        public class TestRequest : TestMessage, IRequest
-        {
-            public string RequestId
-            {
+        public class TestRequest : TestMessage, IRequest {
+            public string RequestId {
                 get;
                 set;
             }
 
-            public string RequesterId
-            {
+            public string RequesterId {
                 get;
                 set;
             }

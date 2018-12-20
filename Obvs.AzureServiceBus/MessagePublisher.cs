@@ -1,159 +1,146 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
-using Microsoft.ServiceBus.Messaging;
+
+using Microsoft.Azure.ServiceBus;
+
 using Obvs.AzureServiceBus.Infrastructure;
 using Obvs.MessageProperties;
 using Obvs.Serialization;
 using Obvs.Types;
 
-namespace Obvs.AzureServiceBus
-{
+namespace Obvs.AzureServiceBus {
+
+    /// <summary>
+    /// Message publisher
+    /// </summary>
+    /// <typeparam name="TMessage"></typeparam>
     public class MessagePublisher<TMessage> : IMessagePublisher<TMessage>
-        where TMessage : class
-    {
-        private readonly IMessagingEntityFactory _messagingEntityFactory;
-        private readonly IMessageSerializer _serializer;
-        private readonly IMessagePropertyProvider<TMessage> _propertyProvider;
-        private readonly IMessageOutgoingPropertiesTable _messageOutgoingPropertiesTable;
-        private readonly ConcurrentDictionary<Type, IMessageSender> _messageTypeMessageSenderMap;
+        where TMessage : class {
+            private readonly IMessagingEntityFactory _messagingEntityFactory;
+            private readonly IMessageSerializer _serializer;
+            private readonly IMessagePropertyProvider<TMessage> _propertyProvider;
+            private readonly IMessageOutgoingPropertiesTable _messageOutgoingPropertiesTable;
+            private readonly ConcurrentDictionary<Type, IMessageSender> _messageTypeMessageSenderMap;
 
-        internal MessagePublisher(IMessagingEntityFactory messagingEntityFactory, IMessageSerializer serializer, IMessagePropertyProvider<TMessage> propertyProvider, IMessageOutgoingPropertiesTable messageOutgoingPropertiesTable)
-        {
-            if(messagingEntityFactory == null) throw new ArgumentNullException(nameof(messagingEntityFactory));
-            if(serializer == null) throw new ArgumentNullException(nameof(serializer));
-            if(propertyProvider == null) throw new ArgumentNullException(nameof(propertyProvider));
-            if(messageOutgoingPropertiesTable == null) throw new ArgumentNullException(nameof(messageOutgoingPropertiesTable));
+            internal MessagePublisher(IMessagingEntityFactory messagingEntityFactory, IMessageSerializer serializer, IMessagePropertyProvider<TMessage> propertyProvider, IMessageOutgoingPropertiesTable messageOutgoingPropertiesTable) {
+                if (messagingEntityFactory == null) throw new ArgumentNullException(nameof(messagingEntityFactory));
+                if (serializer == null) throw new ArgumentNullException(nameof(serializer));
+                if (propertyProvider == null) throw new ArgumentNullException(nameof(propertyProvider));
+                if (messageOutgoingPropertiesTable == null) throw new ArgumentNullException(nameof(messageOutgoingPropertiesTable));
 
-            _messagingEntityFactory = messagingEntityFactory;
-            _serializer = serializer;
-            _propertyProvider = propertyProvider;
-            _messageOutgoingPropertiesTable = messageOutgoingPropertiesTable;
+                _messagingEntityFactory = messagingEntityFactory;
+                _serializer = serializer;
+                _propertyProvider = propertyProvider;
+                _messageOutgoingPropertiesTable = messageOutgoingPropertiesTable;
 
-            _messageTypeMessageSenderMap = new ConcurrentDictionary<Type, IMessageSender>();
-        }
-
-
-        public Task PublishAsync(TMessage message)
-        {
-            IEnumerable<KeyValuePair<string, object>> properties = _propertyProvider.GetProperties(message);
-
-            return PublishAsync(message, properties);
-        }
-
-        public void Dispose()
-        {
-            foreach(IMessageSender messageSender in _messageTypeMessageSenderMap.Values)
-            {
-                messageSender.Dispose();
+                _messageTypeMessageSenderMap = new ConcurrentDictionary<Type, IMessageSender>();
             }
-        }
 
-        private async Task PublishAsync(TMessage message, IEnumerable<KeyValuePair<string, object>> properties)
-        {
-            // NOTE: we don't dispose of the MemoryStream here because BrokeredMessage assumes ownership of it's lifetime
-            MemoryStream messageBodyStream = new MemoryStream();
+            public Task PublishAsync(TMessage message) {
+                IEnumerable<KeyValuePair<string, object>> properties = _propertyProvider.GetProperties(message);
 
-            _serializer.Serialize(messageBodyStream, message);
-
-            messageBodyStream.Position = 0;
-
-            BrokeredMessage brokeredMessage = new BrokeredMessage(messageBodyStream);
-
-            ApplyAnyOutgoingProperties(message, brokeredMessage);
-
-            SetSessionAndCorrelationIdentifiersIfApplicable(message, brokeredMessage);
-
-            SetProperties(message, properties, brokeredMessage);
-
-            IMessageSender messageSenderForMessageType = GetMessageSenderForMessageType(message);
-
-            await messageSenderForMessageType.SendAsync(brokeredMessage);
-        }
-
-        private static void SetProperties(TMessage message, IEnumerable<KeyValuePair<string, object>> properties, BrokeredMessage brokeredMessage)
-        {
-            brokeredMessage.Properties.Add(MessagePropertyNames.TypeName, message.GetType().Name);
-
-                foreach(KeyValuePair<string, object> property in properties)
-                {
-                    brokeredMessage.Properties.Add(property);
-                }
-        }
-
-        private void SetSessionAndCorrelationIdentifiersIfApplicable(TMessage message, BrokeredMessage brokeredMessage)
-        {
-            IRequest requestMessage = message as IRequest;
-
-            if(requestMessage != null)
-            {
-                SetRequestSessionAndCorrelationIdentifiers(brokeredMessage, requestMessage);
+                return PublishAsync(message, properties);
             }
-            else
-            {
-                IResponse responseMessage = message as IResponse;
 
-                if(responseMessage != null)
-                {
-                    SetResponseSessionAndCorrelationIdentifiers(brokeredMessage, responseMessage);
+            /// <inheritdoc />
+            public void Dispose() {
+                foreach (IMessageSender messageSender in _messageTypeMessageSenderMap.Values) {
+                    messageSender.Dispose();
                 }
             }
-        }
 
-        private static void SetRequestSessionAndCorrelationIdentifiers(BrokeredMessage brokeredMessage, IRequest requestMessage)
-        {
-            string requesterId = requestMessage.RequesterId;
+            private async Task PublishAsync(TMessage tmessage, IEnumerable<KeyValuePair<string, object>> properties) {
+                // NOTE: we don't dispose of the MemoryStream here because Message assumes ownership of it's lifetime
+                MemoryStream messageBodyStream = new MemoryStream();
 
-            if(!string.IsNullOrEmpty(requesterId))
-            {
-                brokeredMessage.ReplyToSessionId = requesterId;
+                _serializer.Serialize(messageBodyStream, tmessage);
+
+                messageBodyStream.Position = 0;
+
+                Message message = new Message(messageBodyStream.ToArray());
+
+                ApplyAnyOutgoingProperties(tmessage, message);
+
+                SetSessionAndCorrelationIdentifiersIfApplicable(tmessage, message);
+
+                SetProperties(tmessage, properties, message);
+
+                IMessageSender messageSenderForMessageType = GetMessageSenderForMessageType(tmessage);
+
+                await messageSenderForMessageType.SendAsync(message);
             }
 
-            brokeredMessage.CorrelationId = requestMessage.RequestId;
-        }
+            private static void SetProperties(
+                TMessage tmessage,
+                IEnumerable<KeyValuePair<string, object>> properties,
+                Message message) {
+                message.UserProperties.Add(MessagePropertyNames.TypeName, message.GetType().Name);
 
-        private static void SetResponseSessionAndCorrelationIdentifiers(BrokeredMessage brokeredMessage, IResponse responseMessage)
-        {
-            string requesterId = responseMessage.RequesterId;
-
-            if(!string.IsNullOrEmpty(requesterId))
-            {
-                brokeredMessage.SessionId = requesterId;
+                foreach (KeyValuePair<string, object> property in properties) {
+                    message.UserProperties.Add(property);
+                }
             }
 
-            brokeredMessage.CorrelationId = responseMessage.RequestId;
-        }
+            private void SetSessionAndCorrelationIdentifiersIfApplicable(TMessage tmessage, Message message) {
+                IRequest requestMessage = message as IRequest;
 
-        private IMessageSender GetMessageSenderForMessageType(TMessage message)
-        {
-            Type messageType = message.GetType();
+                if (requestMessage != null) {
+                    SetRequestSessionAndCorrelationIdentifiers(message, requestMessage);
+                } else {
+                    IResponse responseMessage = message as IResponse;
 
-            return _messageTypeMessageSenderMap.GetOrAdd(
-                messageType,
-                CreateMessageSenderForMessageType);
-        }
+                    if (responseMessage != null) {
+                        SetResponseSessionAndCorrelationIdentifiers(message, responseMessage);
+                    }
+                }
+            }
 
-        private IMessageSender CreateMessageSenderForMessageType(Type messageType)
-        {
-            return _messagingEntityFactory.CreateMessageSender(messageType);
-        }
+            private static void SetRequestSessionAndCorrelationIdentifiers(Message message, IRequest requestMessage) {
+                string requesterId = requestMessage.RequesterId;
 
-        private void ApplyAnyOutgoingProperties(TMessage message, BrokeredMessage brokeredMessage)
-        {
-            IOutgoingMessageProperties outgoingProperties = _messageOutgoingPropertiesTable.GetOutgoingPropertiesForMessage(message);
+                if (!string.IsNullOrEmpty(requesterId)) {
+                    message.ReplyToSessionId = requesterId;
+                }
 
-            // Check if there were even any outgoing properties set for this message
-            if(outgoingProperties != null)
-            {
-                brokeredMessage.ScheduledEnqueueTimeUtc = outgoingProperties.ScheduledEnqueueTimeUtc;
-                brokeredMessage.TimeToLive = outgoingProperties.TimeToLive;
+                message.CorrelationId = requestMessage.RequestId;
+            }
 
+            private static void SetResponseSessionAndCorrelationIdentifiers(Message message, IResponse responseMessage) {
+                string requesterId = responseMessage.RequesterId;
 
-                // Remove the properties for the message from the table now that we've mapped them as they'll have no further use beyond this point
-                _messageOutgoingPropertiesTable.RemoveOutgoingPropertiesForMessage(message);
+                if (!string.IsNullOrEmpty(requesterId)) {
+                    message.SessionId = requesterId;
+                }
+
+                message.CorrelationId = responseMessage.RequestId;
+            }
+
+            private IMessageSender GetMessageSenderForMessageType(TMessage message) {
+                Type messageType = message.GetType();
+
+                return _messageTypeMessageSenderMap.GetOrAdd(
+                    messageType,
+                    CreateMessageSenderForMessageType);
+            }
+
+            private IMessageSender CreateMessageSenderForMessageType(Type messageType) {
+                return _messagingEntityFactory.CreateMessageSender(messageType);
+            }
+
+            private void ApplyAnyOutgoingProperties(TMessage tmessage, Message message) {
+                IOutgoingMessageProperties outgoingProperties = _messageOutgoingPropertiesTable.GetOutgoingPropertiesForMessage(message);
+
+                // Check if there were even any outgoing properties set for this message
+                if (outgoingProperties != null) {
+                    message.ScheduledEnqueueTimeUtc = outgoingProperties.ScheduledEnqueueTimeUtc;
+                    message.TimeToLive = outgoingProperties.TimeToLive;
+
+                    // Remove the properties for the message from the table now that we've mapped them as they'll have no further use beyond this point
+                    _messageOutgoingPropertiesTable.RemoveOutgoingPropertiesForMessage(tmessage);
+                }
             }
         }
-    }
 }
